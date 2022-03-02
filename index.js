@@ -46,7 +46,7 @@ function isResponseTimedOut(retryOptions) {
 function shouldRetry(retryOptions, error, response, waitTime, externalSignal) {
     // We must immediately return if the external signal is aborted, else default
     // behaviour would have us retry, due to the internal signal.
-    if (externalSignal.aborted) return false;
+    if (externalSignal && externalSignal.aborted) return false;
     if (getTimeRemaining(retryOptions) < waitTime) {
         return false;
     } else if (retryOptions && retryOptions.retryOnHttpError && error != null) {
