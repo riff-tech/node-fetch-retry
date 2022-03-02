@@ -12,7 +12,6 @@ export interface RetryOptions{
 
 export interface RequestInitWithRetry extends RequestInit {
   retryOptions?: RetryOptions | false
-  abortController?: AbortController
 }
 
 declare function fetch(
