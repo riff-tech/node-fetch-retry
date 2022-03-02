@@ -894,13 +894,32 @@ describe('test fetch retry on http errors (throw exceptions)', () => {
         }
     });
 
-    it('test abort signal option works', async () => {
+    it('test external abort signal option works', async () => {
         nock(FAKE_BASE_URL)
             .get(FAKE_PATH)
             .reply(200);
 
         const AC = new AbortController();
         AC.abort();
+        try {
+            await fetch(`${FAKE_BASE_URL}${FAKE_PATH}`, { method: 'GET', signal: AC.signal, retryOptions: { retryMaxDuration: 2000 } });
+            assert.fail("Should have thrown an error!");
+        } catch(e) {
+            assert(e.message.includes("network timeout"));
+            assert(e.type === "request-timeout");
+            assert.strictEqual(nock.isDone(), false);
+        }
+    });
+
+    it('test external abort signal option works on a retry', async () => {
+        const scope = nock(FAKE_BASE_URL)
+            .get(FAKE_PATH)
+            .reply(500)
+            .get(FAKE_PATH).reply(200);
+
+        const AC = new AbortController();
+        scope.on("request", ()=> {AC.abort();});
+
         try {
             await fetch(`${FAKE_BASE_URL}${FAKE_PATH}`, { method: 'GET', signal: AC.signal, retryOptions: { retryMaxDuration: 2000 } });
             assert.fail("Should have thrown an error!");

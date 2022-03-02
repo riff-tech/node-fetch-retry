@@ -17,8 +17,8 @@ const {FetchError} = fetch;
 
 function getTimeRemaining(retryOptions) {
     if (retryOptions && retryOptions.startTime && retryOptions.retryMaxDuration) {
-        const millisEllapsed = Date.now() - retryOptions.startTime;
-        const remaining = retryOptions.retryMaxDuration - millisEllapsed;
+        const millisElapsed = Date.now() - retryOptions.startTime;
+        const remaining = retryOptions.retryMaxDuration - millisElapsed;
         return Math.max(0, remaining);
     } else {
         return Infinity;
@@ -218,6 +218,7 @@ module.exports = async function (url, options) {
                     if (externalSignal.aborted) {
                         abortController.abort();
                     } else {
+                        // when the external signal is aborted call the internal abort function
                         externalSignal.onabort = () => abortController.abort();
                     }
                 }
