@@ -17,7 +17,7 @@ const {FetchError} = fetch;
 
 function getTimeRemaining(retryOptions) {
     if (retryOptions && retryOptions.startTime && retryOptions.retryMaxDuration) {
-        const millisEllapsed = Date.now() - retryOptions.startTime;        
+        const millisEllapsed = Date.now() - retryOptions.startTime;
         const remaining = retryOptions.retryMaxDuration - millisEllapsed;
         return Math.max(0, remaining);
     } else {
@@ -194,6 +194,7 @@ function shouldRetryOnHttpError(error) {
 module.exports = async function (url, options) {
     options = options || {};
     const retryOptions = retryInit(options); // set up retry options or set to default settings if not set
+    const externalSignal = options.signal || null;
     delete options.retryOptions; // remove retry options from options passed to actual fetch
     let attempt = 0;
 
@@ -204,15 +205,27 @@ module.exports = async function (url, options) {
                 const waitTime = getRetryDelay(retryOptions);
 
                 let timeoutHandler;
+                // set up abort signals, since the caller
+                // expects the wrapper to act as a single request, their signal
+                // must remain valid and continue to work, while we must
+                // create a new one here for each request.
+                const abortController = new AbortController();
+                if (externalSignal) {
+                    if (externalSignal.aborted) {
+                        abortController.abort();
+                    } else {
+                        externalSignal.onabort = () => abortController.abort();
+                    }
+                }
                 if (retryOptions.socketTimeout) {
-                    const controller = new AbortController();
-                    timeoutHandler = setTimeout(() => controller.abort(), retryOptions.socketTimeout);
-                    options.signal = controller.signal;
-                }                
-    
+                    timeoutHandler = setTimeout(() => abortController.abort(), retryOptions.socketTimeout);
+                }
+                // overwrite current signal
+                // the external signal will never be applied directly
+                options.signal = abortController.signal;
+
                 try {
                     const response = await fetch(url, options);
-
                     if (shouldRetry(retryOptions, null, response, waitTime)) {
                         console.error(`Retrying in ${waitTime} milliseconds, attempt ${attempt} failed (status ${response.status}): ${response.statusText}`);
                     } else {
