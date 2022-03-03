@@ -40,9 +40,13 @@ function isResponseTimedOut(retryOptions) {
  * @param {Object} error error object if the fetch request returned an error
  * @param {Object} response fetch call response
  * @param {Number} wait Amount of time we will wait before retrying next
+ * @param {AbortSignal} externalSignal
  * @returns {Boolean} whether or not to retry the request
  */
-function shouldRetry(retryOptions, error, response, waitTime) {
+function shouldRetry(retryOptions, error, response, waitTime, externalSignal) {
+    // We must immediately return if the external signal is aborted, else default
+    // behaviour would have us retry, due to the internal signal.
+    if (externalSignal && externalSignal.aborted) return false;
     if (getTimeRemaining(retryOptions) < waitTime) {
         return false;
     } else if (retryOptions && retryOptions.retryOnHttpError && error != null) {
@@ -226,7 +230,7 @@ module.exports = async function (url, options) {
 
                 try {
                     const response = await fetch(url, options);
-                    if (shouldRetry(retryOptions, null, response, waitTime)) {
+                    if (shouldRetry(retryOptions, null, response, waitTime, externalSignal)) {
                         console.error(`Retrying in ${waitTime} milliseconds, attempt ${attempt} failed (status ${response.status}): ${response.statusText}`);
                     } else {
                         // response.timeout should reflect the actual timeout
@@ -234,8 +238,8 @@ module.exports = async function (url, options) {
                         return resolve(response);
                     }
                 } catch (error) {
-                    if (!shouldRetry(retryOptions, error, null, waitTime)) {
-                        if (error.name === 'AbortError') {
+                    if (!shouldRetry(retryOptions, error, null, waitTime, externalSignal)) {
+                        if (error.name === 'AbortError' && !(externalSignal && externalSignal.aborted)) {
                             return reject(new FetchError(`network timeout at ${url}`, 'request-timeout'));
                         } else {
                             return reject(error);

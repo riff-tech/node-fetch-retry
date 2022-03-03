@@ -894,19 +894,18 @@ describe('test fetch retry on http errors (throw exceptions)', () => {
         }
     });
 
-    it('test abort signal option works', async () => {
-        nock(FAKE_BASE_URL)
+    it('test abort signal option works on a retry', async () => {
+        const scope = nock(FAKE_BASE_URL)
             .get(FAKE_PATH)
-            .reply(200);
-
+            .reply(500)
+            .get(FAKE_PATH).reply(200);
         const AC = new AbortController();
-        AC.abort();
+        scope.on("request", ()=> {console.log("Aborting via external controller"); AC.abort();});
         try {
             await fetch(`${FAKE_BASE_URL}${FAKE_PATH}`, { method: 'GET', signal: AC.signal, retryOptions: { retryMaxDuration: 2000 } });
             assert.fail("Should have thrown an error!");
         } catch(e) {
-            assert(e.message.includes("network timeout"));
-            assert(e.type === "request-timeout");
+            assert(e.type === "aborted");
             assert.strictEqual(nock.isDone(), false);
         }
     });
@@ -1032,4 +1031,42 @@ describe('test fetch retry on http errors (throw exceptions)', () => {
         assert.strictEqual(response.statusText, 'OK');
         assert.strictEqual(response.status, 200);
     });
+});
+
+describe('test shouldRetry', () => {
+    const rewiredFetchRetry = rewire('../index');
+    const shouldRetry = rewiredFetchRetry.__get__('shouldRetry');
+    it('returns false when externalSignal is aborted', () => {
+        const AC = new AbortController();
+        AC.abort();
+        const returnValue = shouldRetry({ retryMaxDuration: Infinity, startTime: 0, retryOnHttpError: () => 'test-for-me' }, 'error', null, Infinity, AC.signal);
+        assert.strictEqual(returnValue, false);
+    });
+
+    it('returns onHttpError value if within retry time and error exists', () => {
+        const returnValue = shouldRetry({ retryMaxDuration: Infinity, startTime: 0, retryOnHttpError: () => 'test-for-me' }, 'error', null, Infinity, null);
+        assert.strictEqual(returnValue, 'test-for-me');
+    });
+
+    it('returns onHttpResponse value if within retry time and no error exists', () => {
+        const returnValue = shouldRetry({ retryMaxDuration: Infinity, startTime: 0, retryOnHttpResponse: () => 'test-for-me' }, null, null, Infinity, null);
+        assert.strictEqual(returnValue, 'test-for-me');
+    });
+
+    it('returns false if within retry time and no retry behaviour exists', () => {
+        const returnValue = shouldRetry({ retryMaxDuration: Infinity, startTime: 0 }, null, null, Infinity, null);
+        assert.strictEqual(returnValue, false);
+    });
+
+    it('returns false value if outside retry time', () => {
+        const returnValue = shouldRetry({ retryMaxDuration: 2000, startTime: -1, retryOnHttpResponse: () => 'test-for-me' }, null, null, Infinity, null);
+        assert.strictEqual(returnValue, false);
+    });
+
+
+    it('returns false if retry options are empty', () => {
+        const returnValue = shouldRetry({}, null, null, Infinity, null);
+        assert.strictEqual(returnValue, false);
+    });
+
 });
