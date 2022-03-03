@@ -239,7 +239,7 @@ module.exports = async function (url, options) {
                     }
                 } catch (error) {
                     if (!shouldRetry(retryOptions, error, null, waitTime, externalSignal)) {
-                        if (error.name === 'AbortError') {
+                        if (error.name === 'AbortError' && !(externalSignal && externalSignal.aborted)) {
                             return reject(new FetchError(`network timeout at ${url}`, 'request-timeout'));
                         } else {
                             return reject(error);
