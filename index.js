@@ -12,7 +12,7 @@
 'use strict';
 
 const AbortController = require('abort-controller');
-const fetch = require('node-fetch');
+let fetch = require('node-fetch');
 if (typeof fetch.default !== "undefined") fetch = fetch.default
 const {FetchError} = fetch;
 
