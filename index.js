@@ -13,8 +13,8 @@
 
 const AbortController = require('abort-controller');
 let fetch = require('node-fetch');
-if (typeof fetch.default !== "undefined") fetch = fetch.default
 const {FetchError} = fetch;
+if (typeof fetch.default !== "undefined") fetch = fetch.default
 
 function getTimeRemaining(retryOptions) {
     if (retryOptions && retryOptions.startTime && retryOptions.retryMaxDuration) {
